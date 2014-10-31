@@ -1,3 +1,8 @@
+SimpleSHM
+=========
+
+a very simple and functionnal Shared Memory based on Redis
+
 # Mise en route de la mémoire partagée (SHM) et des applications
 
 ## Redis
