@@ -7,6 +7,7 @@
 
 from collections import namedtuple, OrderedDict
 import struct
+import time
 
 # coeffs
 slong2deg = 180.0/(2**31)
@@ -31,6 +32,7 @@ class Trame(object):
     def __init__(self):
         self.framedesc = namedtuple(self.name, self.fieldsname)
         self.datas = OrderedDict(zip(self.fieldsname, [0]*len(self.fieldsname)))
+        self.size = 0
 
     def get_crctrame(self, fields):
         pass
@@ -55,9 +57,28 @@ class Bintrame(Trame):
     def __init__(self):
         super().__init__(self)
         self.struct = struct.Struct(self.struct_fmt)
+        self.size = self.struct.size
+        self.is_valid = False
+
+    def read(self, fd):
+        buff = fd.read(self.size)
+        sync_pos = buff.find(self.first_bytes)
+        if sync_pos == -1:
+            # impossible de trouver un marqueur de trame
+            return -1
+        # else
+        ts = time.time()
+        if sync_pos != 0:
+            buff = buff[sync_pos] + fd.read(sync_pos)
+        trame = self.parse(buff)
+        if trame is None:
+            # Trame invalide (bad crc)
+            return -2
+        self.timestamp = ts
+        self.datas = trame
+        return 1
 
     def parse(self, buff):
-
         fields = list(self.struct.unpack(buff))
         if self.get_crctrame(fields) != self.do_crc(buff):
             return None
@@ -77,3 +98,14 @@ class Asciitrame(Trame):
 
     def __init__(self):
         super().__init__(self)
+
+    def read(self, fd):
+        line = fd.readline()
+        ts = time.time()
+        trame = self.parse(line)
+        if trame is None:
+            # Trame invalide (bad crc)
+            return -2
+        self.timestamp = ts
+        self.datas = trame
+        return 1
