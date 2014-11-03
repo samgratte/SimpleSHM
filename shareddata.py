@@ -34,7 +34,7 @@ HOWTO :
 
 import time
 from os import getenv, environ, path
-from sys import stderr
+from sys import stderr, argv
 import redis
 import json
 import csv
@@ -54,6 +54,23 @@ def set_UTC_time():
     time.tzset()
 
 
+def assert_option(option, option_name):
+    if not option:
+        option = getenv(option_name)
+        if not option:
+            raise ValueError("%s non positionné" % option_name)
+    return option
+
+
+def check_appname(app_name):
+    if not app_name:
+        app_name = path.basename(argv[0])
+        pos = app_name.rfind('.py')
+        if pos > 0:
+            app_name = app_name[:pos]
+    return app_name
+
+
 class Waiting(object):
 
     def __init__(self, frequency):
@@ -67,15 +84,7 @@ class Waiting(object):
         if time_passed > self.periode:
             return
         # else:
-        time.sleep(self.period - time_passed)
-
-
-def assert_option(option, option_name):
-    if not option:
-        option = getenv(option_name)
-        if not option:
-            raise ValueError("%s non positionné" % option_name)
-    return option
+        time.sleep(self.periode - time_passed)
 
 
 class SharedMemory(object):
@@ -212,9 +221,11 @@ class Data(object):
             return
         if not hasattr(self, 'logfile'):
             # open csv log file
-            logfilename = time.strftime('%Y-%m-%d_%Hh%Mm%SsZ') + '_' \
-                + self.sender + '_' + self.name + '.csv'
-            logfilename = path.join(self.logdir, logfilename)
+            logfilename = getenv('LOGFILE')
+            if not logfilename:
+                logfilename = time.strftime('%Y-%m-%d_%Hh%Mm%SsZ') + '_' \
+                    + self.sender + '_' + self.name + '.csv'
+                logfilename = path.join(self.logdir, logfilename)
             self.logfile = open(logfilename, 'wb', buffering=1)  # line buffering
             self.csv = csv.writer(self.logfile)
             self.csv.writerow(self.trame._fields)
@@ -229,7 +240,7 @@ class DataDict(object):
 
     def __init__(self, sender_name, shm):
         self.conx = shm.conx
-        self.origin = sender_name
+        self.origin = check_appname(sender_name)
         self.datasfromshm = []
         self.datastoshm = []
         self.keys = shm.conx.keys('*')
