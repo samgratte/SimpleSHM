@@ -17,6 +17,11 @@ ushort2deg = 360.0/(2**16)
 
 def xor_crc(buff):
 
+    """
+    /!\ le map/reduce est moins performant en 2.7.8 !
+    from operator import xor
+    return reduce(xor, map(ord, buff))
+    """
     crc = 0
     for c in buff:
         crc ^= ord(c)
@@ -29,10 +34,11 @@ class Trame(object):
     fieldsname = []
     first_bytes = ''
 
-    def __init__(self):
+    def __init__(self, fd):
         self.framedesc = namedtuple(self.name, self.fieldsname)
         self.datas = OrderedDict(zip(self.fieldsname, [0]*len(self.fieldsname)))
         self.size = 0
+        self.fd = fd
 
     def get_crctrame(self, fields):
         pass
@@ -43,43 +49,20 @@ class Trame(object):
     def add_crc(self, buff):
         pass
 
+    def get_fields(self, buff):
+        pass
+
     def build_fields(self):
         pass
 
     def process_fields(self, fields):
         pass
 
-
-class Bintrame(Trame):
-
-    struct_fmt = ""
-
-    def __init__(self):
-        super().__init__(self)
-        self.struct = struct.Struct(self.struct_fmt)
-        self.size = self.struct.size
-        self.is_valid = False
-
-    def read(self, fd):
-        buff = fd.read(self.size)
-        sync_pos = buff.find(self.first_bytes)
-        if sync_pos == -1:
-            # impossible de trouver un marqueur de trame
-            return -1
-        # else
-        ts = time.time()
-        if sync_pos != 0:
-            buff = buff[sync_pos] + fd.read(sync_pos)
-        trame = self.parse(buff)
-        if trame is None:
-            # Trame invalide (bad crc)
-            return -2
-        self.timestamp = ts
-        self.datas = trame
-        return 1
+    def read(self):
+        pass
 
     def parse(self, buff):
-        fields = list(self.struct.unpack(buff))
+        fields = self.get_fields(buff)
         if self.get_crctrame(fields) != self.do_crc(buff):
             return None
 
@@ -87,17 +70,56 @@ class Bintrame(Trame):
 
         return self.framedesc._make(fields)
 
-    def build(self):
+    def __iter__(self):
+        return self
 
+    def next(self):
+        while True:
+            return self.read()
+
+
+class BinaryTrame(Trame):
+
+    struct_fmt = ""
+
+    def __init__(self, fd):
+        super().__init__(self, fd)
+        self.struct = struct.Struct(self.struct_fmt)
+        self.size = self.struct.size
+
+    def read(self, fd):
+        buff = fd.read(self.size)
+        sync_pos = buff.find(self.first_bytes)
+        if sync_pos == -1:
+            # impossible de trouver un marqueur de trame
+            return None
+        # else
+        ts = time.time()
+        if sync_pos != 0:
+            buff = buff[sync_pos] + fd.read(sync_pos)
+        trame = self.parse(buff)
+        if trame is None:
+            # Trame invalide (bad crc)
+            return None
+        self.timestamp = ts
+        self.datas = trame
+        return trame
+
+    def get_fields(self, buff):
+        return list(self.struct.unpack(buff))
+
+    def build(self):
         fields = self.build_fields()
         buff = self.first_bytes + self.struct.pack(*[fields[n] for n in self.fieldsname])
         return self.add_crc(buff)
 
 
-class Asciitrame(Trame):
+class AsciiTrame(Trame):
 
-    def __init__(self):
-        super().__init__(self)
+    delim = ','
+
+    def __init__(self, fd):
+        super().__init__(self, fd)
 
     def read(self, fd):
         line = fd.readline()
@@ -105,7 +127,13 @@ class Asciitrame(Trame):
         trame = self.parse(line)
         if trame is None:
             # Trame invalide (bad crc)
-            return -2
+            return None
         self.timestamp = ts
         self.datas = trame
-        return 1
+        return trame
+
+    def get_fields(self, line):
+        return line.strip().split(self.delim)
+
+    def build(self):
+        pass
