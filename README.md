@@ -169,8 +169,14 @@ passe en paramètres avec un `keyword` :
 **Le logs des données** s'effectue à cet instant dans le fichier correspondant.
 Un fichier de log est créé pour chaque donnée en écriture et les champs y sont
 inscrits ligne par ligne au format *CSV* pour chaque ordre `set` sur la donnée.
-Si une variable d'environnement `'LOGDIR'` est positionnée, les fichiers de logs
-y sont écrits, sinon ils le sont dans le répertoire courant.
+Il faut qu'une variable d'environnement `'LOGDIR'` soit positionnée, les fichiers de logs
+y sont écrits, sinon cela désactive le log des données.
+
+```
+$ export LOGDIR='/var/log'
+$ ./hdl_ains.py -i 'INIT_MSG' -a 'PROP_READING' -f 10 'PROP__readings' 0 1 2 3
+$ LOGDIR='' ./hdl_gpio_in.py -a 'WATER_DETECT' -i 'INIT_MSG' 'PHINS__Enclosure_water_detected' 48
+```
 
 Lorsque toutes les données ont été renseignées on envoie l'ordre de les écrire
 vers la SHM. On peut ainsi grouper l'écriture de plusieurs données afin qu'elles
