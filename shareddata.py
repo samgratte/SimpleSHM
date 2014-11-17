@@ -158,6 +158,27 @@ class SharedMemory(object):
             exit()
 
 
+class Fifo(object):
+
+    def __init(self, data, shm):
+        self.conx = shm.conx
+        self.data = data
+
+    def push(self, *args, **kv):
+        self.data.set(*args, **kv)
+        self.conx.rpush(self.data.name, self.data.to_shm())
+
+    def pop(self):
+        self.data.from_shm(self.conx.lpop(self.data.name))
+        return self.data.trame
+
+    def drain(self):
+        p = self.conx.pipeline()
+        p.lrange(self.name, 0, -1)
+        p.delete(self.name)
+        return [self.data.from_shm(trame) for trame in p.execute()[0]]
+
+
 class Data(object):
 
     def __init__(self, name, jsonframe, sender=''):
@@ -175,8 +196,12 @@ class Data(object):
             self.sender = sender
 
     def from_shm(self, jsonframe):
-        dico = json.loads(jsonframe, object_pairs_hook=OrderedDict)
-        self.trame = self.nt._make(dico.values())
+        if jsonframe:
+            dico = json.loads(jsonframe, object_pairs_hook=OrderedDict)
+            self.trame = self.nt._make(dico.values())
+        else:
+            self.trame = None
+        return self.trame
 
     def to_shm(self):
         return json.dumps(self.trame._asdict())
@@ -243,6 +268,7 @@ class DataDict(object):
         self.origin = check_appname(sender_name)
         self.datasfromshm = []
         self.datastoshm = []
+        self.fifos = []
         self.keys = shm.conx.keys('*')
         self.shm = shm
         shm.datadicts.append(self)
@@ -255,6 +281,11 @@ class DataDict(object):
             datas.append(Data(name, self.conx.get(name), sender=self.origin))
         return datas
 
+    def declare_fifos(self, namelist):
+        for data in self.fetch_new_datas(namelist):
+            self.fifos.append(Fifo(data, self.conx))
+        return [f for f in self.fifos if f.data.name in namelist]
+
     def set_datas_to_read(self, namelist):
         # TODO: renvoyer un itérateur sur les données à lire
         # de manière à pouvoir récupérer plusieurs groupes de données
@@ -263,21 +294,19 @@ class DataDict(object):
         self.datasfromshm += newdatas
         return newdatas
 
-    def get_datas(self, datalist):
+    def read_datas(self, datalist):
         # la lecture des données s'effectue au sein d'une transaction
         p = self.conx.pipeline()
-        datas = []
+        datas_nt = []
         for data in datalist:
             # récupération à partir de Redis
             p.get(data.name)
         for data, result in izip(datalist, p.execute()):
-            res = None
-            if result:  # la donnée a été trouvée
-                data.from_shm(result)
-                if data.sender:  # la donnée a bien été écrite après init
-                    res = data.trame
-            datas.append(res)
-        return datas
+            nt = data.from_shm(result)
+            if not data.sender:  # donnée non initialisée
+                nt = None
+            datas_nt.append(nt)
+        return datas_nt
 
     def listen_to(self, datalist, pattern):
         ps = self.conx.pubsub()
@@ -288,7 +317,7 @@ class DataDict(object):
         for message in ps.listen():
             if not message['data'] is 'available':
                 continue
-            yield self.get_datas(datalist)
+            yield self.read_datas(datalist)
 
     def listen_to_datas(self, namelist, pattern=None):
         """
@@ -308,31 +337,30 @@ class DataDict(object):
     def __iter__(self):
         return self
 
-    def flush(self):
+    def write(self):
         """
         écrit toutes les données à écrire vers la mémoire partagée
         """
         p = self.conx.pipeline()
         for data in self.datastoshm:
-            if not data.is_to_be_written:  # donnée non rafraîchie
-                continue
-            data.sender = self.origin
-            p.set(data.name, data.to_shm(), data.expire)
-            p.publish(data.name, 'available')
-            # on indique que la donnée a été écrite
-            data.is_to_be_written = False
+            if data.is_to_be_written:
+                data.sender = self.origin
+                p.set(data.name, data.to_shm(), data.expire)
+                p.publish(data.name, 'available')
+                # on indique que la donnée a été écrite
+                data.is_to_be_written = False
+                data.ts = 0.0
         p.execute()
 
     def get_data(self, data):
-        data.from_shm(self.conx.get(data.name))
-        return data.trame
+        return data.from_shm(self.conx.get(data.name))
 
     def next(self):
         """
         renvoie à chaque itération une liste de namedtuple
         corespondants aux données lues dans Redis
         """
-        return self.get_datas(self.datasfromshm)
+        return self.read_datas(self.datasfromshm)
 
     def close(self):
         for data in self.datastoshm:
