@@ -33,33 +33,17 @@ HOWTO :
 """
 
 import time
-from os import getenv, environ, path
-from sys import stderr, argv
+from os import path, getenv
+from sys import argv
 import redis
 import json
 import csv
 from collections import namedtuple, OrderedDict
 from itertools import izip
+
+from divers import fatal_error, assert_option, set_UTC_time
+
 import plac
-
-
-def fatal_error(msg):
-    stderr.write("\n%s\n" % msg)
-    exit(1)
-
-
-def set_UTC_time():
-    # On travaille en UTC
-    environ['TZ'] = 'UTC'
-    time.tzset()
-
-
-def assert_option(option, option_name):
-    if not option:
-        option = getenv(option_name)
-        if not option:
-            raise ValueError("%s non positionné" % option_name)
-    return option
 
 
 def check_appname(app_name):
@@ -99,8 +83,7 @@ class SharedMemory(object):
             print "[%02d] Attente de Redis ...." % i
             time.sleep(10)
         else:
-            stderr.write("Impossible de se connecter à Redis %s:%d!" % (host, port))
-            exit()
+            fatal_error("Impossible de se connecter à Redis %s:%d!" % (host, port))
 
         if env_init_option:
             init_msg = assert_option(None, env_init_option)
@@ -154,25 +137,33 @@ class SharedMemory(object):
             print "[%02d] Attente de %s ...." % (i, initmsg)
             time.sleep(1)
         else:
-            stderr.write("\nLa SHM ne s'est pas initialisée !\n")
-            exit()
+            fatal_error("\nLa SHM ne s'est pas initialisée !\n")
 
 
 class Fifo(object):
-
+    """
+    Utilise une liste de Redis pour implémenter un tube avec plusieurs
+    écrivains et (en général) un seul lecteur.r
+    """
     def __init(self, data, shm):
+        " "
         self.conx = shm.conx
         self.data = data
 
     def push(self, *args, **kv):
+        """ affecte les champs à la donnée et envoie la donnée dans le tube """
         self.data.set(*args, **kv)
         self.conx.rpush(self.data.name, self.data.to_shm())
 
     def pop(self):
+        """ récupère une donnée du tube et la renvoie
+        sous sa forme en namedtuple """
         self.data.from_shm(self.conx.lpop(self.data.name))
         return self.data.trame
 
     def drain(self):
+        """ récupère toutes les données disponibles dans le tube et les
+        renvoie sous forme de liste """
         p = self.conx.pipeline()
         p.lrange(self.name, 0, -1)
         p.delete(self.name)
@@ -282,6 +273,14 @@ class DataDict(object):
         return datas
 
     def declare_fifos(self, namelist):
+        """
+        déclare les tubes utilisés par la suite :
+        - pour émettre une donnée dans un tube : fifo.push(*fields)
+        - pour récupérer une donnée du tube et la sortir : donnee = fifo.pop()
+        - pour travailler sur toutes les données disponibles à ce moment :
+            for donnee in fifo.drain():
+                print donnee
+        """
         for data in self.fetch_new_datas(namelist):
             self.fifos.append(Fifo(data, self.conx))
         return [f for f in self.fifos if f.data.name in namelist]
