@@ -15,19 +15,6 @@ sshort2deg = 180.0/(2**15)
 ushort2deg = 360.0/(2**16)
 
 
-def xor_crc(buff):
-
-    """
-    /!\ le map/reduce est moins performant en 2.7.8 !
-    from operator import xor
-    return reduce(xor, map(ord, buff))
-    """
-    crc = 0
-    for c in buff:
-        crc ^= ord(c)
-    return crc
-
-
 class Trame(object):
 
     name = ''
