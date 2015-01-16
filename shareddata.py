@@ -320,7 +320,7 @@ class DataDict(object):
     def __iter__(self):
         return self
 
-    def write(self):
+    def write(self, timestamp=None):
         """
         écrit toutes les données à écrire vers la mémoire partagée
         """
@@ -328,6 +328,8 @@ class DataDict(object):
         for data in self.datastoshm:
             if data.is_to_be_written:
                 data.sender = self.origin
+                if timestamp:
+                    data.timestamp = timestamp
                 p.set(data.name, data.to_shm(), data.expire)
                 p.publish(data.name, 'available')
                 # on indique que la donnée a été écrite
