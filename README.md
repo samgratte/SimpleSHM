@@ -54,7 +54,8 @@ $ python -m shareddata -i INIT_MSG datadesc.json
 
 Chaque application dispose d'une aide intégrée et d'une vérification
 élémentaire des paramètres qui lui sont passés en argument.
-Cette fonctionnalité repose sur le module Python *plac*.
+Cette fonctionnalité repose sur le module Python
+[*plac*](http://plac.googlecode.com/hg/doc/plac.html).
 
 ```
 $ ./hdl_battery.py -h
@@ -168,15 +169,34 @@ passe en paramètres avec un `keyword` :
 ```
 
 Lorsque toutes les données ont été renseignées **on envoie l'ordre de les écrire
-vers la SHM avec `flush()`**. On peut ainsi grouper l'écriture de plusieurs données afin qu'elles
+vers la SHM avec `write()`**. On peut ainsi grouper l'écriture de plusieurs données afin qu'elles
 restent cohérentes entre elles, l'écriture vers la SHM étant réalisée au sein
 d'une *transaction*, garantissant l'atomicité de l'opération.
 
 ```Python
-   dd.flush()
+   dd.write()
 ```
 
-**Un fichier de log** est créé pour chaque donnée en écriture et les champs y sont
+## Lire et écrire avec des FIFOs
+
+On peut utiliser des FIFOs pour avoir un mécanisme plusieurs producteurs, un
+consommateur.
+
+```Python
+# déclarer une ou plusieurs FIFOs :
+my_fifo1, my_fifo2, myfifo3 = declare_fifos(["FIFO1_NAME", "FIFO2_NAME", "FIFO3_NAME"])
+# émettre une donnée :
+myfifo1.push(*data_fields)
+# récupérer une donnée et la sortir :
+data = my_fifo1.pop()
+# vider la fifo :
+for data in my_fifo1.drain():
+    print data
+```
+
+## Log des données
+
+Un fichier de log est créé pour chaque donnée en écriture et les champs y sont
 inscrits ligne par ligne au format *CSV* pour chaque ordre `set()` sur la donnée.
 Il faut qu'une variable d'environnement `'LOGDIR'` soit positionnée, les fichiers de logs
 y sont écrits, sinon cela désactive le log des données.
