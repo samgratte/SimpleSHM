@@ -55,22 +55,6 @@ def check_appname(app_name):
     return app_name
 
 
-class Waiting(object):
-
-    def __init__(self, frequency):
-        self.periode = 1.0/frequency
-
-    def set_start(self):
-        self.start_time = time.time()
-
-    def wait_next(self):
-        time_passed = time.time() - self.start_time
-        if time_passed > self.periode:
-            return
-        # else:
-        time.sleep(self.periode - time_passed)
-
-
 class SharedMemory(object):
 
     def __init__(self, host='127.0.0.1', port=6379, env_init_option=None,
