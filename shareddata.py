@@ -171,11 +171,8 @@ class Data(object):
             self.sender = sender
 
     def from_shm(self, jsonframe):
-        if jsonframe:
-            dico = json.loads(jsonframe, object_pairs_hook=OrderedDict)
-            self.trame = self.nt._make(dico.values())
-        else:
-            self.trame = None
+        dico = json.loads(jsonframe, object_pairs_hook=OrderedDict)
+        self.trame = self.nt._make(dico.values())
         return self.trame
 
     def to_shm(self):
@@ -203,14 +200,17 @@ class Data(object):
         le timestamp et l'émetteur si besoin
         """
         now = time.time()
-        self.trame = self.nt._make([self.ts, self.sender]+list(args))
-        if len(kv):
+        if len(args) == (len(self.trame._fields) - 2):
+            self.trame = self.nt._make([self.ts, self.sender]+list(args))
+        elif len(kv):
             od = self.trame._asdict()
             for k in od:
                 if k in kv:
                     od[k] = kv[k]
             self.trame = self.nt._make(od.values())
             self.expire = None if 'expire' not in kv else kv['expire']
+        else:
+            raise ValueError, "Arguments incompatibles avec le format de donnée !"
         if self.ts == 0.0:  # on positionne un timestamp valide
             self.ts = now
         self.is_to_be_written = True
