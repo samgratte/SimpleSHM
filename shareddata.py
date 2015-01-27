@@ -298,7 +298,7 @@ class DataDict(object):
         else:
             ps.subscribe(datalist[0].name)
         for message in ps.listen():
-            if not message['data'] is 'available':
+            if message['data'] != 'available':
                 continue
             yield self.read_datas(datalist)
 
