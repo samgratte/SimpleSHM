@@ -210,7 +210,7 @@ class Data(object):
             self.trame = self.nt._make(od.values())
             self.expire = None if 'expire' not in kv else kv['expire']
         else:
-            raise ValueError, "Arguments incompatibles avec le format de donnée !"
+            raise ValueError("Arguments incompatibles avec le format de donnée !")
         if self.ts == 0.0:  # on positionne un timestamp valide
             self.ts = now
         self.is_to_be_written = True
@@ -248,12 +248,15 @@ class DataDict(object):
         self.shm = shm
         shm.datadicts.append(self)
 
+    def fetch_new_data(self, dataname):
+        if dataname not in self.keys:
+            raise ValueError("%s dataname not in SHM !" % dataname)
+        return Data(dataname, self.conx.get(dataname), sender=self.origin)
+
     def fetch_new_datas(self, namelist):
         datas = []
         for name in namelist:
-            if name not in self.keys:
-                raise ValueError("%s dataname not in SHM !" % name)
-            datas.append(Data(name, self.conx.get(name), sender=self.origin))
+            datas.append(self.fetch_new_data(name))
         return datas
 
     def declare_fifos(self, namelist):
@@ -276,6 +279,9 @@ class DataDict(object):
         newdatas = self.fetch_new_datas(namelist)
         self.datasfromshm += newdatas
         return newdatas
+
+    def read_data(self, data):
+        return data.from_shm(self.conx.get(data.name))
 
     def read_datas(self, datalist):
         # la lecture des données s'effectue au sein d'une transaction
@@ -336,9 +342,6 @@ class DataDict(object):
                 data.is_to_be_written = False
                 data.ts = 0.0
         p.execute()
-
-    def get_data(self, data):
-        return data.from_shm(self.conx.get(data.name))
 
     def next(self):
         """
