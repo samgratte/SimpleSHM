@@ -306,7 +306,10 @@ class DataDict(object):
         for message in ps.listen():
             if message['data'] != 'available':
                 continue
-            yield self.read_datas(datalist)
+            if len(datalist) < 2:
+                yield self.read_data(datalist[0])
+            else:
+                yield self.read_datas(datalist)
 
     def listen_to_datas(self, namelist, pattern=None):
         """
@@ -326,6 +329,15 @@ class DataDict(object):
     def __iter__(self):
         return self
 
+    def write_data(self, data, timestamp=None, media=None):
+        if media is None:
+            media = self.conx
+        data.sender = self.origin
+        if timestamp:
+            data.timestamp = timestamp
+        media.set(data.name, data.to_shm(), data.expire)
+        media.publish(data.name, 'available')
+
     def write(self, timestamp=None):
         """
         écrit toutes les données à écrire vers la mémoire partagée
@@ -333,11 +345,7 @@ class DataDict(object):
         p = self.conx.pipeline()
         for data in self.datastoshm:
             if data.is_to_be_written:
-                data.sender = self.origin
-                if timestamp:
-                    data.timestamp = timestamp
-                p.set(data.name, data.to_shm(), data.expire)
-                p.publish(data.name, 'available')
+                self.write_data(data, timestamp=timestamp, media=p)
                 # on indique que la donnée a été écrite
                 data.is_to_be_written = False
                 data.ts = 0.0
