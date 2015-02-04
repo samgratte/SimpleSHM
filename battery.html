@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/javascript" src="/static/smoothie.js"></script>
+        <script type="text/javascript" src="/static/rendercharts.js"></script>
+        <script type="text/javascript">
+            function InitCharts(){
+                RenderCharts("/servdata/BATTERY__Measures?fields=uBat,uelMin,tempMax&frequency=5","battery","Mesures Batterie");
+            }
+        </script>
+    </head>
+    <body onload="InitCharts()"> 
+        <h1>Données</h1>
+        <div id="battery"></div>
+    </body>
+</html>

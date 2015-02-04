@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type=text/javascript src="/static/jquery.js"></script>
+        <script>
+            function ShowData(dataname,data){
+                table = '<h2>' + dataname + '</h2>'
+                table += "<table><tr><th>Field Name</th><th>Field Value</th></tr>"
+                for (field in data) {
+                    table += "<tr><td>" + field + '</td><td>' +
+                        data[field] + '</td></tr>'
+                }
+                table += '</table>'
+                return table
+            }
+            function InitFlux(){
+                var source = new
+                    EventSource("/servdata/PUPITRE__joyleft?fields=ts,axe_horizontal,axe_vertical&frequency=0.5");
+                source.onmessage = function f(event) {
+                    values = JSON.parse(event.data);
+                    document.getElementById('datas').innerHTML = ShowData('Data Name', values);
+                }
+            }
+        </script>
+    </head>
+    <body onload="InitFlux()"> 
+        <h1>Données</h1>
+        <div id="datas"></div>
+    <script type=text/javascript>
+        $(function() {
+            $('a#getdatainfo').bind('click', function() {
+                dataname = $('input[name="dataname"]').val()
+                $.getJSON('/servdata/'+dataname+'?frequency=-1', {},
+                        function(data) {
+                            $("#resultinfo").text(data.result);
+                            document.getElementById('resultinfo').innerHTML =
+                                ShowData(dataname, data.result);
+                });
+                return false;
+            });
+        });
+    </script>
+        <div id="datainfo">
+            <input type=text size=20 name=dataname>
+            <span id=resultinfo>???</span><p>
+            <a href=# id=getdatainfo>Interroger la SHM</a>
+        </div>
+        <script type=text/javascript>
+  $(function() {
+    $('a#setdata').bind('click', function() {
+      $.getJSON('/setdata/PARASAS__presencetension?is_on=True', {
+        a: $('input[name="a"]').val(),
+        b: $('input[name="b"]').val()
+      }, function(data) {
+        $("#result").text(data.result);
+      });
+      return false;
+    });
+  });
+</script>
+        <div id="postdata">
+            <p><input type=text size=5 name=a> +
+   <input type=text size=5 name=b> =
+   <span id=result>?</span>
+<p><a href=# id=setdata>poster les nouvelles valeurs</a>
+        </div>
+    </body>
+</html>
