@@ -87,10 +87,13 @@ class SharedMemory(object):
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
 
-    def blank_and_initSHM(self, jsonfile, env_option_name=''):
+    def blank_and_initSHM(self, jsonfiles, env_option_name=''):
         initmsg = assert_option(None, env_option_name)
-        descfile = open(jsonfile, 'r')
-        datadesc = json.loads(descfile.read(), object_pairs_hook=OrderedDict)
+        datadesc = OrderedDict()
+        for jsonfile in jsonfiles:
+            descfile = open(jsonfile, 'r')
+            datadesc.update(json.loads(descfile.read(),
+                            object_pairs_hook=OrderedDict))
         self.conx.flushdb()
         p = self.conx.pipeline()
         for dd in datadesc:
@@ -366,14 +369,14 @@ class DataDict(object):
 
 
 @plac.annotations(
-    descfile=("fichier JSON de description des données", 'positional'),
+    descfiles=("fichiers JSON de description des données", 'positional'),
     redis_server=("Nom ou @ IP de la cpu sur laquelle tourne Redis", 'option', 'r'),
     redis_port=("N° de port tcp pour se connecter à Redis", 'option', 'p', int),
     env_init=("Nom de la variable d'environnement qui contient la data d'init de la shm", 'option', 'i')
 )
-def main(descfile, redis_server='localhost', redis_port=6379, env_init=None):
+def main(redis_server='localhost', redis_port=6379, env_init=None, *descfiles):
     shm = SharedMemory(host=redis_server, port=redis_port)
-    shm.blank_and_initSHM(descfile, env_init)
+    shm.blank_and_initSHM(descfiles, env_init)
 
 if __name__ == '__main__':
     plac.call(main)
