@@ -176,7 +176,7 @@ class Waiting(object):
 
 
 def main():
-    " testons tout celà "
+    " testons tout celà et plus"
 
 if __name__ == '__main__':
     plac.call(main)
