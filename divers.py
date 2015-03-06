@@ -155,8 +155,10 @@ def bools_from8bit(value, nbbits=8, negate=False):
 
 class Waiting(object):
 
-    def __init__(self, frequency):
+    def __init__(self, frequency, set_start=False):
         self.periode = 1.0/frequency
+        if set_start:
+            self.set_start()
 
     def set_start(self):
         self.start_time = time()
@@ -164,6 +166,8 @@ class Waiting(object):
     def wait_next(self, set_start=False):
         time_passed = time() - self.start_time
         if time_passed > self.periode:
+            if set_start:
+                self.set_start()
             return
         # else:
         sleep(self.periode - time_passed)
